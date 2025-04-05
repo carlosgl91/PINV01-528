@@ -1,8 +1,26 @@
-// Aplicación para descarga de imágenes
-// Autor: Ing. Amb. Carlos Giménez
-//* Changelong: 29-09-2024
-//* Changelong: 08-03-2025
-//* Changelong: 14-03-2025
+/**
+ * @name
+ *      Aplicación de procesamiento y descarga de imágenes satelitales - PINV01-528
+ * 
+ * @description
+ *      This is a processing and download tool for the PINV-528 project from CONACYT Paraguay
+ *  
+ * @author
+ *      Carlos Giménez
+ * 
+ * @contact
+ *      Carlos Giménez and Dr. Pastor Pérez
+ *      carlos.gimenez@showmewhere.com
+ *
+ * @version
+ *    1.0.0 - Acess and download data using user's vector
+ *    1.1.0 - Updated to interface
+ *    1.1.1 - Updated exporting names and other features
+ *    1.1.2 - Added parameters report
+ * 
+ * @see
+ *       Repository - https://github.com/carlosgl91/PINV01-528
+ */
 
 ui.root.clear();
 
@@ -21,14 +39,69 @@ var App = {
     filterSize: 3 // Default filter size is 3x3
   },
   processedCollection: null,  
-  filteredCollections: {},     
-
+  filteredCollections: {},
+  
+  //iso_weeks report data
+  r_total_iso_weeks_in_range:null,
+  r_iso_weeks_with_data:null,
+  r_missing_iso_weeks_in_range:null,
+  r_count_missing_isoweeks:null,
+  //variable descriptions
+  
+  
+  report:{
+      // How many quarters we have in the time period
+          // How many images in total
+          // How many images per quarter
+          // How many images per month
+    start_date:null,
+    end_date:null,
+    cloud_cover_perc:null,
+    img_count_total:null,
+    img_count_quarters:null,
+    img_count_months:null,
+    img_count_iso_weeks:null,
+    //Report metadata
+    metadata_for_reporting:  [{
+                              id: 'analysisType',
+                              desc: 'Valor seleccionado para el parámetro agrupación temporal (Trimestral, Semanas ISO, Periodo completo)'},
+                              {
+                              id: 'start_date',
+                              desc: 'Fecha de inicio del periodo de filtrado de imágenes satelitales'},
+                              {
+                              id: 'end_date',
+                              desc: 'Fecha final del periodo de filtrado de imágenes satelitales'},
+                              {
+                              id: 'cloud_cover_perc',
+                              desc: 'Valor selecionado para el parámetro de filtro de cobertura de nubes (%)'
+                              },
+                              {
+                              id: 'img_count_iso_weeks',
+                              desc: 'Semanas ISO con datos presentes en el periodo comprendido entre la fecha inicial y final especificados'
+                              },
+                              {
+                              id: 'img_count_months',
+                              desc: 'Meses con datos presentes en el periodo comprendido entre la fecha inicial y final especificados'
+                              },
+                              {
+                              id: 'img_count_total',
+                              desc: 'Número total de imágenes filtradas y procesadas'
+                              },
+                              ]
+  },
+  
   init: function () {
     // Calls the UI initialization
     this.ui.init();
   },
 
   countIsoWeeks : function(startDate, endDate, imageCollection) {
+    //Sets the report variables to null 
+    App.r_total_iso_weeks_in_range=null;
+    App.r_iso_weeks_with_data=null;
+    App.r_missing_iso_weeks_in_range=null;
+    App.r_count_missing_isoweeks=null;
+    
     // Parse the date range
     var start = ee.Date(startDate);
     var end = ee.Date(endDate);
@@ -51,14 +124,21 @@ var App = {
     // Count the number of missing ISO weeks
     var missingWeeksCount = missingIsoWeeks.length();
   
+    
+    
+    App.r_total_iso_weeks_in_range= allIsoWeeks.length();
+    App.r_iso_weeks_with_data=isoWeeksWithData;
+    App.r_missing_iso_weeks_in_range=missingIsoWeeks;
+    App.r_count_missing_isoweeks=missingWeeksCount;
+    
     // Print the total number of weeks, missing weeks, and count of missing weeks
-    print('Total ISO weeks in range:', allIsoWeeks.length());
-    print('ISO weeks with data:', isoWeeksWithData);
-    print('Missing ISO weeks:', missingIsoWeeks);
-    print('Total number of missing ISO weeks:', missingWeeksCount);
+    print('Total ISO weeks in range:',App.r_total_iso_weeks_in_range);
+    print('ISO weeks with data:', App.r_iso_weeks_with_data);
+    print('Missing ISO weeks:', App.r_missing_iso_weeks_in_range);
+    print('Total number of missing ISO weeks:', App.r_count_missing_isoweeks);
   },
 
- exportModule: {
+  exportModule: {
   // Function to export composite images (mean, median, etc.) for each quarter
   exportCompositeImages: function(compositeCollection, descriptionPrefix, suffix, region, selectedTimeAggregation, batchSize) {
   // Obtener la lista de IDs de imágenes sin traer toda la colección al cliente
@@ -268,6 +348,23 @@ var App = {
     var isoWeek = ee.Number(date.getRelative('week', 'year')).subtract(weekOffset).add(1); 
     return isoWeek;
   },
+  getIsoYear : function(date,isoWeek) {
+   date = ee.Date(date);
+  var year = date.get('year');
+  var week = isoWeek;
+  var month = date.get('month');
+  var day = date.get('day');
+
+  // If it's early January and still part of ISO week 52 or 53, it's part of the previous ISO year
+  var isPreviousYear = week.gte(52).and(month.eq(1));
+
+  // If it's late December and week 1, it's part of the next ISO year
+  var isNextYear = week.eq(1).and(month.eq(12));
+
+  return ee.Number(year)
+    .subtract(ee.Number(isPreviousYear))
+    .add(ee.Number(isNextYear));
+  },
 
   getQuarter: function (date) {
     var month = date.get('month');
@@ -311,12 +408,22 @@ var App = {
 },
 
   addQuarterAndIsoWeek: function (image) {
+    //Adds date, iso_week, 
     var date = image.date();
+    var yearMonth = date.format('YYYY-MM');
+    var year = date.format('YYYY');
     var quarter = App.getQuarter(date);
     var isoWeek = App.getIsoWeek(date);
-    
+    var iso_year = App.getIsoYear(date,isoWeek)
+    var isoWeek_year =  iso_year.format('%04d').cat('_').cat(isoWeek.format('%02d')); // YYYY_WW format
+    var quarter_year =  year.cat('_').cat(quarter.format('%d')); // YYYY-Q format
+
+
     return image.set('quarter', quarter)
               .set('iso_week', isoWeek)
+              .set('yearMonth', yearMonth)
+              .set('isoWeek_year', isoWeek_year)
+               .set('quarter_year', quarter_year)
               .copyProperties(image, image.propertyNames());
   },
 
@@ -442,24 +549,40 @@ var App = {
 
 
   // Esta función define que periodo ha sido seleccionado, llama a las funciones correspondientes
-  // y almacena los datos procesados en las collecciones correspondientes
+  // y almacena los datos procesados en las colecciones correspondientes
   applyTimeAnalysis: function (imageCollection) {
         //Generamos dos colecciones, filteredCollection 
         var filteredCollections = {}; // Inicializamos un objeto vacio
         var processedCollection; // 
       
         if (App.selectedTimeAggregation === 'Trimestral') {
+          // Things to inform from here...
+          
+          // List of images, acquisition dates, cc, asset id, quarter, iso week,grid name
+          
+          // How many quarters we have in the time period
+          // How many images in total
+          // How many images per quarter
+          // How many images per month
+          
+          
           // Procesar trimestralmente
+          // This adds the indexes as bands, and quarter and corresponding isoweek to each image
           var quarterlyCollection = imageCollection.map(App.addIndices).map(App.addQuarterAndIsoWeek);
+          // Produces a list of quarters present in the collection
           var uniqueQuarters = quarterlyCollection.aggregate_array('quarter').distinct().sort();
-      
+          // print(uniqueQuarters,"quarters")
+          
+          // produces a list with as much as images as quarters
           var quarterlyImages = uniqueQuarters.map(function (quarter) {
+            // Filters the collection per quarter and returns as much images as quarters were provided
             return App.getQuarterlyStatistics(quarter, quarterlyCollection);
           });
+          // print(quarterlyImages,"quarters")
       
           var quarterlyStatsCollection = ee.ImageCollection(quarterlyImages);
       
-          // Aplicar filtros espaciales
+          // Aplicar filtros espaciales cuando son seleccionados
           if (App.filterOptions.mean) {
             filteredCollections.mean = App.applySpatialFilter(quarterlyStatsCollection, 'mean');
           }
@@ -469,8 +592,9 @@ var App = {
           if (App.filterOptions.majority) {
             filteredCollections.majority = App.applySpatialFilter(quarterlyStatsCollection, 'majority');
           }
-      
+          // Imprime a la consola las imagenes de la colección trimestral
           print('Colección de estadísticas trimestrales:', quarterlyStatsCollection);
+          // Guarda en la variable de colecciones procesadas fuera del IF Trimestral
           processedCollection = quarterlyStatsCollection;
       
         } else if (App.selectedTimeAggregation === 'Semanas ISO') {
@@ -627,6 +751,7 @@ var App = {
         this.controlPanel.add(this.slider_filterSize);
         this.controlPanel.add(this.button_generate);
         this.controlPanel.add(this.button_download);
+        this.controlPanel.add(this.link_documentation);
         this.mainPanel_Map.add(this.messagePanel);
         ui.root.add(this.mainPanel_Map);
         ui.root.add(this.controlPanel);
@@ -660,12 +785,12 @@ var App = {
         App.ui.forms.messageLabel.style().set({ color: color });
       },
       label_ToolTitle: ui.Label({
-        value: 'Aplicación de procesamiento y descarga de imágenes satelitales - PNV01-530',
+        value: 'Aplicación de procesamiento y descarga de imágenes satelitales - PINV01-528',
         style: { fontSize: '25px', color: '#8b8b8b',textAlign: 'center'}
       }),
       label_aoi: ui.Label({
         value: 'Área de interés',
-        style: { fontSize: '15px', fontWeight: 'bold' }
+        style: {  fontWeight: 'bold' }
       }),
       subpanel_Parameters: ui.Panel({
         layout: ui.Panel.Layout.flow('vertical'),
@@ -711,10 +836,11 @@ var App = {
           App.ui.forms.cBox_draw.setValue(false);
         }
       }),
-      label_propertyID: ui.Label('Especifique el ID del área de interés (asset)'),
+      label_propertyID: ui.Label({value:'Especifique el ID del área de interés (asset)', style:{'fontWeight': 'bold'}}),
       textBox_propertyAssetID: ui.Textbox({
         placeholder: 'Especifique ID de la tabla',
-        value: 'projects/ee-lc-monitoring/assets/proyecto_pinv530/tapyta_y_pomera_buffer500m'
+        value: 'projects/ee-lc-monitoring/assets/tpd_area',
+        style:{'width':'320px'}
       }),
       button_uploadBoundary: ui.Button("Cargar límites", function () {
         // Remove the aoi
@@ -740,19 +866,19 @@ var App = {
           }
         }
       }),
-      label_Period_start: ui.Label('Fecha de inicio del periodo'),
-      label_Period_end: ui.Label('Fecha de fin del periodo'),
+      label_Period_start: ui.Label({value:'Fecha de inicio del periodo',style:{'fontWeight': 'bold'}}),
+      label_Period_end: ui.Label({value:'Fecha de fin del periodo',style:{'fontWeight': 'bold'}}),
       textBox_Period_start: ui.Textbox({
         placeholder: 'aaaa-mm-dd',
         value: '2021-01-01',
-        style: { fontWeight: 'bold', fontSize: '12px', textAlign: 'left', width: '100px' }
+        style: { fontSize: '12px', textAlign: 'left', width: '100px' }
       }),
       textBox_Period_end: ui.Textbox({
         placeholder: 'aaaa-mm-dd',
         value: '2021-06-30',
-        style: { fontWeight: 'bold', fontSize: '12px', textAlign: 'left', width: '100px' }
+        style: {  fontSize: '12px', textAlign: 'left', width: '100px' }
       }),
-      label_cloudCover: ui.Label('Porcentaje máximo de nubes'),
+      label_cloudCover: ui.Label({value:'Porcentaje máximo de nubes',style:{'fontWeight': 'bold'}}),
       slider_cloudCover: ui.Slider({
         min: 0,
         max: 100,
@@ -760,7 +886,7 @@ var App = {
         step: 1,
         style: { width: '200px' }
       }),
-      label_timeAggregation: ui.Label('Agrupación temporal'),
+      label_timeAggregation: ui.Label({value:'Agrupación temporal',style:{'fontWeight': 'bold'}}),
             select_timeAggregation: ui.Select({
           items: ['Trimestral', 'Semanas ISO', 'Periodo Completo'], // Added 'Periodo Completo'
           placeholder: 'Seleccione un tipo de análisis',
@@ -768,7 +894,7 @@ var App = {
             App.selectedTimeAggregation = selected;
           }
       }),
-      label_spatialFilters: ui.Label('Filtros espaciales (opcional)'),
+      label_spatialFilters: ui.Label({value:'Filtros espaciales (opcional)',style:{'fontWeight': 'bold'}}),
       checkbox_mean: ui.Checkbox({
         label: 'Aplicar media',
         value: false,
@@ -790,7 +916,7 @@ var App = {
           App.filterOptions.majority = value;
         }
       }),
-      label_spatialFilterSize: ui.Label('Tamaño del filtro espacial'),
+      label_spatialFilterSize: ui.Label({value:'Tamaño del filtro espacial',style:{'fontWeight': 'bold'}}),
       slider_filterSize: ui.Slider({
         min: 3,
         max: 10,
@@ -803,12 +929,21 @@ var App = {
       }),
       button_generate: ui.Button({
         label: 'Generar',
+        style:{width:'150px'},
         onClick: function () {
+          // Estos valores van a ser utilizados dentro del reporte
           var startDate = App.ui.forms.textBox_Period_start.getValue();
           var endDate = App.ui.forms.textBox_Period_end.getValue();
           var cloudCoverValue = App.ui.forms.slider_cloudCover.getValue();
           var analysisType = App.selectedTimeAggregation;
-      
+           
+          App.report.start_date = startDate;
+          App.report.end_date = endDate;
+          App.report.cloud_cover_perc = cloudCoverValue;
+          App.report.analysisType = analysisType;
+         
+ 
+      print("Párametros:",App.report)
       //---------------------------------------------------------------------------------------------------    
       //------------------------------------------------------Validation----------------------------------- 
       //--------------------------------------------------------------------------------------------------- 
@@ -849,15 +984,24 @@ var App = {
       
             // Only count ISO weeks if the selected time aggregation is "Semanas ISO"
             if (analysisType === 'Semanas ISO') {
+              // This is just informative and will produce and store counts about the disponibility of 
+              //iso weeks within the date range
               App.countIsoWeeks(startDate, endDate, imageCollection);
             }
       
             var count = imageCollection.size();
+           App.report.img_count_total = count
+           App.report.img_count_quarters = imageCollection.aggregate_array('quarter_year').distinct().sort()
+           App.report.img_count_months = imageCollection.aggregate_array('yearMonth').distinct().sort();
+           App.report.img_count_iso_weeks = imageCollection.sort('date').aggregate_array('isoWeek_year').distinct();
             
+          print("Párametros:",App.report)
+
             count.evaluate(function (cnt) {
               if (cnt === 0) {
                 App.ui.forms.updateMessage("No se encontraron imágenes con los parámetros especificados.", true);
               } else {
+                //here the time analysis function is applied
                 App.applyTimeAnalysis(imageCollection);
                 App.ui.forms.updateMessage("Análisis completado. Revise la consola para más detalles.", false);
               }
@@ -867,6 +1011,7 @@ var App = {
 }),
    button_download: ui.Button({
   label: 'Descargar',
+  style:{width:'150px'},
   onClick: function () {
     if (!App.processedCollection) {
       App.ui.forms.updateMessage("Por favor, genere los datos antes de descargar.", true);
@@ -886,6 +1031,10 @@ var App = {
     App.ui.forms.updateMessage("Descarga iniciada. Revise su Google Drive para los archivos exportados.", false);
   }
 }),
+    link_documentation:ui.Label({
+      value: 'Documentación',
+      targetUrl: "https://github.com/carlosgl91/PINV01-528"
+    })
     }
 
   },
