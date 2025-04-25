@@ -7,3 +7,5 @@ Repositorio de algoritmos para procesamiento automatizado de imágenes satelital
 
 
 1.1- Script para procesamiento y cambio de formatos 
+
+1.2- Descripción inicial del procesamiento a través del diagrama de flujo (borrador inicial con mermaid)
