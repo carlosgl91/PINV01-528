@@ -9,22 +9,38 @@
  *      Carlos Giménez
  * 
  * @contact
- *      Carlos Giménez and Dr. Pastor Pérez
- *      carlos.gimenez@showmewhere.com
+ *      Carlos Giménez - carlos.gimenez@showmewhere.com/ 
+ *      Dr. Pastor Pérez - peperez.estigarribia@pol.una.py/ peperez.estigarribia@gmail.com 
  *
  * @version
- *    1.0.0 - Acess and download data using user's vector
- *    1.1.0 - Updated to interface
- *    1.1.1 - Updated exporting names and other features
- *    1.1.2 - Added parameters report
- * 
+ *    1.0.0 - CG Access and download data using user's vector
+ *    1.1.0 - CG Updated to interface
+ *    1.1.1 - CG Updated exporting names and other features
+ *    1.1.2 - CG Added parameters report (Need to include the list of images, currently only for periodo completo), also export as csv for each type of time agreggation
+ *    1.1.3 - CG Added image visualization module (Need to list the images by type of time agreggation)
+ *    1.1.4 - CG Edited getQuarterlyStatistics function to consider multiple years
+ *    1.1.4 - CG Added image id for the results based on the temporal units (isoweek_year, quarter_year ) - pending
+ *    1.1.5 - CG Changed S2 TOA collection by S2 SR collections
+ *    1.1.5 - CG Added rescaling procedure of the bands
+ *    1.1.6 - CG Added Cloud and shadows processing (Removals and void filling)
+ *    1.1.7 - CG Variables selection
+ *    1.1.7 - CG Reporting function for each time aggregation type
  * @see
- *       Repository - https://github.com/carlosgl91/PINV01-528
+ *    Repository - https://github.com/carlosgl91/PINV01-528
+ * 
+ * @comming soon
+ * English interface
+ * Study area subseting by field 
+ * Shadow and cloud masking improvement using s2cloudness procedure 
+ *  Image selecction for inclusion or exclusion
+ *  Including other satelites (not so soon) (v.1.2)
  */
 
 ui.root.clear();
 
 var tools = require('users/charlieswall/functions_cg:appTools');
+var s2_tools = require('users/charlieswall/CARLOSGL07:sentinel_2/S2_functions');
+
 
 var currentDatea = new Date().toISOString().slice(0, 10);
 
@@ -40,7 +56,15 @@ var App = {
   },
   processedCollection: null,  
   filteredCollections: {},
+  Image_Col_to_process:null, // This object will store the images filtered by the parameters entered by the user
+  available_variables:{
+    bands: ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9',  'B11', 'B12'],
+    indexes: ['NDVI', 'NDBI','NDWI','SAVI'],
+    
+  },
   
+  selected_vars:[],
+  selectedVars:null,
   //iso_weeks report data
   r_total_iso_weeks_in_range:null,
   r_iso_weeks_with_data:null,
@@ -94,64 +118,32 @@ var App = {
     // Calls the UI initialization
     this.ui.init();
   },
-
-  countIsoWeeks : function(startDate, endDate, imageCollection) {
-    //Sets the report variables to null 
-    App.r_total_iso_weeks_in_range=null;
-    App.r_iso_weeks_with_data=null;
-    App.r_missing_iso_weeks_in_range=null;
-    App.r_count_missing_isoweeks=null;
-    
-    // Parse the date range
-    var start = ee.Date(startDate);
-    var end = ee.Date(endDate);
-  
-    // Calculate the total number of ISO weeks in the date range
-    var totalWeeks = end.difference(start, 'week').floor();
-    
-    // Generate a list of all ISO weeks in the range
-    var allIsoWeeks = ee.List.sequence(0, totalWeeks).map(function(weekOffset) {
-      var weekDate = start.advance(weekOffset, 'week');
-      return App.getIsoWeek(weekDate);
-    }).distinct(); // Ensure unique ISO weeks
-    
-    // Get the ISO weeks with data from the image collection
-    var isoWeeksWithData = imageCollection.aggregate_array('iso_week').distinct().sort();
-  
-    // Find missing ISO weeks (i.e., weeks that have no data)
-    var missingIsoWeeks = allIsoWeeks.removeAll(isoWeeksWithData);
-  
-    // Count the number of missing ISO weeks
-    var missingWeeksCount = missingIsoWeeks.length();
-  
-    
-    
-    App.r_total_iso_weeks_in_range= allIsoWeeks.length();
-    App.r_iso_weeks_with_data=isoWeeksWithData;
-    App.r_missing_iso_weeks_in_range=missingIsoWeeks;
-    App.r_count_missing_isoweeks=missingWeeksCount;
-    
-    // Print the total number of weeks, missing weeks, and count of missing weeks
-    print('Total ISO weeks in range:',App.r_total_iso_weeks_in_range);
-    print('ISO weeks with data:', App.r_iso_weeks_with_data);
-    print('Missing ISO weeks:', App.r_missing_iso_weeks_in_range);
-    print('Total number of missing ISO weeks:', App.r_count_missing_isoweeks);
-  },
-
+  // MODULES
+  /*
+      This module contains two funcitons:
+      1. exportCompositeImages
+      2. exportSpatiallyFilteredImages
+      3. exportAll: This is the general function that calls 1 and 2. It also sets a prefix that is later used in 1 and 2. 
+      */
   exportModule: {
-  // Function to export composite images (mean, median, etc.) for each quarter
+  // Function to export composite images (mean, median, etc.)
   exportCompositeImages: function(compositeCollection, descriptionPrefix, suffix, region, selectedTimeAggregation, batchSize) {
+  print(compositeCollection, "Pre export col")
   // Obtener la lista de IDs de imágenes sin traer toda la colección al cliente
   compositeCollection.aggregate_array('system:index').evaluate(function(imageIds) {
     if (!imageIds) return;
 
     // Dividir en lotes según el batchSize
     var batches = [];
+    // creates batches of a given size 
     for (var i = 0; i < imageIds.length; i += batchSize) {
+      //Adds to the list
       batches.push(imageIds.slice(i, i + batchSize));
     }
 
-    // Función de exportación sin getInfo()
+    // Funtion with for each running on each batch
+    // Takes the images, filters them by system index, creates prefix, suffix, start and end dates, year
+    // Finally depending on the time aggregation, creates the name
     var exportBatch = function(batch) {
       batch.forEach(function(imageId) {
         var image = compositeCollection.filter(ee.Filter.eq('system:index', imageId)).first();
@@ -162,10 +154,11 @@ var App = {
         var startDateStr = ee.String(image.get('start_date'));
         var endDateStr = ee.String(image.get('end_date'));
         var year = ee.Date(startDateStr).get('year').format();
+        var quarter = ee.Number(image.get('quarter')).format('%.0f');
 
         var filename = ee.Algorithms.If(
           selectedTimeAggregation === 'Trimestral',
-          prefix.cat('_Q').cat(ee.Number(image.get('quarter')).format('%.0f')).cat('_Year_').cat(year).cat(suffixStr),
+          prefix.cat('_Q').cat(quarter).cat('_Year_').cat(year).cat(suffixStr),
           ee.Algorithms.If(
             selectedTimeAggregation === 'Semanas ISO',
             prefix.cat('_Week').cat(ee.String(image.get('iso_week'))).cat('_Year_').cat(year).cat(suffixStr),
@@ -178,17 +171,20 @@ var App = {
         );
 
         // Obtener escala de resolución de la imagen sin extraer datos al cliente
-        var scale = image.projection().nominalScale();
+        // var scale = image.projection().nominalScale();
         print('Exportando imagen:', filename);
+        // print('Scale:', scale);
+
+        // Para el nombre llama a get info y lo añade a la funcion estándar para exportar al drive
         filename = filename.getInfo();
-        // Exportación sin getInfo()
+
         Export.image.toDrive({
           image: image.clip(region),
           description: filename,
           fileNamePrefix: filename,
           folder: "PINV01_Exports",
           region: region,
-          scale: scale,
+          scale: 10,
           maxPixels: 1e13
         });
 
@@ -203,6 +199,7 @@ var App = {
     });
   });
 },
+    
   exportSpatiallyFilteredImages: function(filteredCollections, descriptionPrefix, suffix, region, selectedTimeAggregation, batchSize) {
   // Iterate over each filter type in the collections
   Object.keys(filteredCollections).forEach(function(filterType) {
@@ -266,9 +263,7 @@ var App = {
             )
           );
 
-          // Optionally, keep scale dynamic:
-          // var scale = image.projection().nominalScale();
-          // Or keep the fixed scale = 10 (as in your original code):
+           
           var scale = 10;
 
           // Convert ee.String to a plain JS string for Export
@@ -298,31 +293,85 @@ var App = {
   });
     
   },
+  exportReportImageList: function(compositeCollection){
+    
+    var csv_file_name;
+    if (App.selectedTimeAggregation === 'Semanas ISO') {
+        csv_file_name = 'ISO_week';
+    } else if (App.selectedTimeAggregation === 'Trimestral') {
+        csv_file_name = 'Quarter';
+    } else if (App.selectedTimeAggregation === 'Periodo Completo') {
+        csv_file_name = 'Full_period';
+    } else {
+        csv_file_name = 'Unknown';
+    }
+    
+     // **Collect image metadata**
+     
+     print(compositeCollection,"ImageCollection to list")
+        var imageMetadata = compositeCollection.map(function(image) {
+          return ee.Feature(null, {
+            'image_id': image.id(),
+            'system_start_time': image.get('system:time_start'),
+            'cloud_coverage': image.get('CLOUDY_PIXEL_PERCENTAGE'),
+            'isoWeek_year':image.get('isoWeek_year'),
+            'iso_week':image.get('iso_week'),
+            'quarter':image.get('quarter'),
+            'quarter_year':image.get('quarter_year'),
+            'yearMonth':image.get('yearMonth')
+
+
+
+
+            // 'provider': image.get('SATELLITE'),
+            // 'collection': image.get('SENSOR')
+          });
+        });
+    
+        // **Export image metadata as CSV**
+        Export.table.toDrive({
+          collection: imageMetadata,
+          description: 'ImageList_' + csv_file_name ,
+          fileFormat: 'CSV',
+          folder: 'PINV01_Exports'
+        });
+  },
 
   // Unified function to call export for reduced and filtered images
+  /*
+  This function requieres the reduced and filtered collections and the region
+  depending on the time agreggation it sets the "prefix" for the file name,
+  then in calls the exportCompositeimage function for exporting the processed stack of images
+  and optionally the exportSpatiallyFilteredImages functioon to export the spatially filtered images
+  */
   exportAll: function(reducedCollection, filteredCollections, region) {
+    // Sets a description prefix depending of the selected time agreggation
     var descriptionPrefix;
     if (App.selectedTimeAggregation === 'Semanas ISO') {
-        descriptionPrefix = 'Weekly';
+        descriptionPrefix = 'ISO_week';
     } else if (App.selectedTimeAggregation === 'Trimestral') {
-        descriptionPrefix = 'Quarterly';
+        descriptionPrefix = 'Trimestre';
     } else if (App.selectedTimeAggregation === 'Periodo Completo') {
-        descriptionPrefix = 'Period';
+        descriptionPrefix = 'Periodo';
     } else {
         descriptionPrefix = 'Unknown';
     }
-  
+    
+     App.exportModule.exportReportImageList(App.Image_Col_to_process);
     // Export the reduced collection
+    // This function use the reduced collection of images, the prefix, suffix (for spatially filtered)
+    // region, selected time agreggation and batchSize 
     App.exportModule.exportCompositeImages(reducedCollection, descriptionPrefix, '', region,App.selectedTimeAggregation,5);
-  
+ 
     // Export spatially filtered collections if any
     if (Object.keys(filteredCollections).length > 0) {
       // filteredCollections, descriptionPrefix, suffix, region, selectedTimeAggregation, batchSize
       App.exportModule.exportSpatiallyFilteredImages(filteredCollections, descriptionPrefix, '_Filtered', region,App.selectedTimeAggregation,5);
     }
   
-    App.ui.forms.updateMessage("Export process started. Check your Google Drive.", false);
+    App.ui.forms.updateMessage("Proceso de exportar iniciado, revise la pestaña Tasks", false);
   }
+
 
 },
 
@@ -339,6 +388,49 @@ var App = {
         App.ui.forms.mainPanel_Map.centerObject(aoi);
       }
     });
+  },
+  // Function for reporting in the console
+  countIsoWeeks : function(startDate, endDate, imageCollection) {
+    //Sets the report variables to null 
+    App.r_total_iso_weeks_in_range=null;
+    App.r_iso_weeks_with_data=null;
+    App.r_missing_iso_weeks_in_range=null;
+    App.r_count_missing_isoweeks=null;
+    
+    // Parse the date range
+    var start = ee.Date(startDate);
+    var end = ee.Date(endDate);
+  
+    // Calculate the total number of ISO weeks in the date range
+    var totalWeeks = end.difference(start, 'week').floor();
+    
+    // Generate a list of all ISO weeks in the range
+    var allIsoWeeks = ee.List.sequence(0, totalWeeks).map(function(weekOffset) {
+      var weekDate = start.advance(weekOffset, 'week');
+      return App.getIsoWeek(weekDate);
+    }).distinct(); // Ensure unique ISO weeks
+    
+    // Get the ISO weeks with data from the image collection
+    var isoWeeksWithData = imageCollection.aggregate_array('iso_week').distinct().sort();
+  
+    // Find missing ISO weeks (i.e., weeks that have no data)
+    var missingIsoWeeks = allIsoWeeks.removeAll(isoWeeksWithData);
+  
+    // Count the number of missing ISO weeks
+    var missingWeeksCount = missingIsoWeeks.length();
+  
+    
+    
+    App.r_total_iso_weeks_in_range= allIsoWeeks.length();
+    App.r_iso_weeks_with_data=isoWeeksWithData;
+    App.r_missing_iso_weeks_in_range=missingIsoWeeks;
+    App.r_count_missing_isoweeks=missingWeeksCount;
+    
+    // Print the total number of weeks, missing weeks, and count of missing weeks
+    print('Total ISO weeks in range:',App.r_total_iso_weeks_in_range);
+    print('ISO weeks with data:', App.r_iso_weeks_with_data);
+    print('Missing ISO weeks:', App.r_missing_iso_weeks_in_range);
+    print('Total number of missing ISO weeks:', App.r_count_missing_isoweeks);
   },
 
   getIsoWeek: function (date) {
@@ -365,7 +457,6 @@ var App = {
     .subtract(ee.Number(isPreviousYear))
     .add(ee.Number(isNextYear));
   },
-
   getQuarter: function (date) {
     var month = date.get('month');
     return ee.Number(month).divide(3).ceil();
@@ -388,6 +479,108 @@ var App = {
     return ee.Number(0);  // Invalid
   }
 },
+
+    /**
+   * Masks clouds and cirrus in a Sentinel-2 SR image using the QA60 band.
+   * @param {ee.Image} image The input Sentinel-2 image.
+   * @return {ee.Image} The cloud-masked image, with cloudy pixels being masked out.
+   */
+  cloudMask: function(image) {
+    var qa = image.select('QA60');
+    // Bits 10 and 11 are clouds and cirrus, respectively.
+    var cloudBitMask = 1 << 10;
+    var cirrusBitMask = 1 << 11;
+    // Create a mask where both flags are 0, indicating clear conditions.
+    var mask = qa.bitwiseAnd(cloudBitMask).eq(0)
+        .and(qa.bitwiseAnd(cirrusBitMask).eq(0));
+    // Apply the mask to the image and copy its properties.
+    return image.updateMask(mask).copyProperties(image, image.propertyNames());
+  },
+  /**
+ * Applies cloud masking and then fills the resulting voids (gaps).
+ * The void-filling strategy depends on the selected temporal aggregation.
+ * @param {ee.ImageCollection} imageCollection The input collection to process.
+ * @return {ee.ImageCollection} A new collection with clouds masked and voids filled.
+ */
+ 
+  applyCloudMaskAndFillVoids: function(imageCollection) {
+      
+              var analysisType = App.selectedTimeAggregation;
+            
+              // Step 1: Apply the cloud mask to every image in the collection.
+              var maskedCollection = imageCollection.map(App.cloudMask);
+            
+              App.ui.forms.updateMessage("Cloud masking complete. Filling voids...", false);
+            
+              // Step 2: Fill the voids based on the selected analysis type.
+              if (analysisType === 'Periodo Completo') {
+            // For the full period, create one median composite from the ENTIRE original collection to fill gaps.
+            var medianFiller = imageCollection.median();
+        
+            var filledCollection = maskedCollection.map(function(image) {
+                // Replace masked pixels in each image with the value from the period's median composite.
+                return image.unmask(medianFiller).copyProperties(image, image.propertyNames());
+            });
+            return filledCollection;
+        
+        } else if (analysisType === 'Trimestral') {
+            // For quarterly analysis, fill gaps using the median of the respective quarter.
+            var uniqueQuarters = ee.List(imageCollection.aggregate_array('quarter_year')).distinct();
+        
+            var filledByQuarter = uniqueQuarters.map(function(quarter_year) {
+                // Create the median composite for this specific quarter from the ORIGINAL collection.
+                var quarterMedianFiller = imageCollection
+                    .filter(ee.Filter.eq('quarter_year', quarter_year))
+                    .median();
+        
+                // Filter the MASKED collection and fill the voids for all images in this quarter.
+                var filledImages = maskedCollection
+                    .filter(ee.Filter.eq('quarter_year', quarter_year))
+                    .map(function(image) {
+                        return image.unmask(quarterMedianFiller).copyProperties(image, image.propertyNames());
+                    });
+                return filledImages;
+            });
+        
+            // The result is a list of ImageCollections. Flatten it into a single ImageCollection.
+            return ee.ImageCollection(ee.FeatureCollection(filledByQuarter).flatten());
+        
+        } else if (analysisType === 'Semanas ISO') {
+            // For ISO week analysis, efficiently fill gaps using the median of the corresponding quarter.
+            
+            // 1. Get a list of all unique quarters in the collection.
+            var uniqueQuarters = ee.List(imageCollection.aggregate_array('quarter_year')).distinct();
+            
+            // 2. Iterate over each unique quarter.
+            var filledByQuarter = uniqueQuarters.map(function(quarter_year) {
+                
+                // 3. Calculate the median filler for this quarter just ONCE.
+                var quarterMedianFiller = imageCollection
+                    .filter(ee.Filter.eq('quarter_year', quarter_year))
+                    .median();
+                
+                // 4. Filter the MASKED collection to get all images belonging to this quarter.
+                var imagesInQuarter = maskedCollection.filter(ee.Filter.eq('quarter_year', quarter_year));
+                
+                // 5. Map over this smaller, quarter-specific collection and fill the voids.
+                var filledImages = imagesInQuarter.map(function(image) {
+                    return image.unmask(quarterMedianFiller).copyProperties(image, image.propertyNames());
+                });
+                
+                // You can print inside the loop if you need to debug a specific quarter
+                // print('Images filled for quarter: ' + quarter_year, filledImages);
+                
+                return filledImages;
+            });
+            
+            // 6. The result is a list of ImageCollections. Flatten it into a single collection.
+            return ee.ImageCollection(ee.FeatureCollection(filledByQuarter).flatten());
+                
+        } else {
+            // If no matching analysis type, just return the masked collection with no filling.
+            return maskedCollection;
+        }
+    },
 
   addIndices: function (image) {
   var ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI').toFloat();
@@ -447,11 +640,17 @@ var App = {
   
   
   // Esta función obtiene las estadisticas básicas de la colección para cada trimestre
-  getQuarterlyStatistics: function (quarter, collection) {
-  var quarterCollection = collection.filter(ee.Filter.eq('quarter', quarter));
+    // Here it is important to have in mind that, when multiple years, the function could produce one image per quarter instead  
+  // of one image per quarter and year. So we should add a year property for the filter
+  getQuarterlyStatistics: function (quarter_year, collection) {
+    
+  var quarterCollection = collection.filter(ee.Filter.eq('quarter_year', quarter_year));
   var imageCount = quarterCollection.size();
   var startDate = ee.Date(quarterCollection.first().get('system:time_start'));
   var endDate = ee.Date(quarterCollection.sort('system:time_start', false).first().get('system:time_start'));
+  var quarter = quarterCollection.first().get('quarter')
+
+ 
 
   var meanImage = quarterCollection.mean()
     .toFloat()
@@ -487,19 +686,23 @@ var App = {
                               .addBands(minImage)
                               .addBands(maxImage)
                               .addBands(stdDevImage)
-                              .set('quarter', quarter)
+                              .set('quarter', quarter)////
+                              .set('quarter_year', quarter_year)
                               .set('start_date', startDate.format('YYYY-MM-dd'))
                               .set('end_date', endDate.format('YYYY-MM-dd'))
                               .set('image_count', imageCount)
                               .set('system:time_start', startDate.millis());
 
-  return combinedImage;
-},
+ 
+   return combinedImage ;
+      
+  },
 
   // Esta función obtiene las estadisticas básicas de la colección para cada isoweek
-
+  // Here it is important to have in mind that, when multiple years, the function could produce one image per week instead  
+  // of one image per week and year. So we should add a year property for the filter
   getWeeklyStatistics: function (isoWeek, collection) {
-  var weekCollection = collection.filter(ee.Filter.eq('iso_week', isoWeek));
+  var weekCollection = collection.filter(ee.Filter.eq('iso_week', isoWeek)); 
   var imageCount = weekCollection.size();
   var startDate = ee.Date(weekCollection.first().get('system:time_start'));
   var endDate = ee.Date(weekCollection.sort('system:time_start', false).first().get('system:time_start'));
@@ -568,11 +771,18 @@ var App = {
           
           // Procesar trimestralmente
           // This adds the indexes as bands, and quarter and corresponding isoweek to each image
-          var quarterlyCollection = imageCollection.map(App.addIndices).map(App.addQuarterAndIsoWeek);
-          // Produces a list of quarters present in the collection
-          var uniqueQuarters = quarterlyCollection.aggregate_array('quarter').distinct().sort();
-          // print(uniqueQuarters,"quarters")
+          var quarterlyCollection = imageCollection
           
+          // Create a collection of images per quarter
+          
+          quarterlyCollection = quarterlyCollection.map(App.addIndices)
+          
+          print(quarterlyCollection,"Quarterly col")
+          
+          // a year identifier should be added here
+
+          var uniqueQuarters = quarterlyCollection.aggregate_array('quarter_year').distinct().sort();
+
           // produces a list with as much as images as quarters
           var quarterlyImages = uniqueQuarters.map(function (quarter) {
             // Filters the collection per quarter and returns as much images as quarters were provided
@@ -593,7 +803,6 @@ var App = {
             filteredCollections.majority = App.applySpatialFilter(quarterlyStatsCollection, 'majority');
           }
           // Imprime a la consola las imagenes de la colección trimestral
-          print('Colección de estadísticas trimestrales:', quarterlyStatsCollection);
           // Guarda en la variable de colecciones procesadas fuera del IF Trimestral
           processedCollection = quarterlyStatsCollection;
       
@@ -621,33 +830,18 @@ var App = {
       
           print('Colección de estadísticas semanales:', weeklyStatsCollection);
           processedCollection = weeklyStatsCollection;
+          
+          
       } else if (App.selectedTimeAggregation === 'Periodo Completo') {
-     
+
         // Apply indices to the images
-        var periodCollection = imageCollection.map(App.addIndices);
+        var periodCollection = imageCollection.map(App.addIndices)
+        print(periodCollection, "collection after select bands")
     
         var imageCount = periodCollection.size();
         var startDate = ee.Date(periodCollection.first().get('system:time_start'));
         var endDate = ee.Date(periodCollection.sort('system:time_start', false).first().get('system:time_start'));
-    
-        // **Collect image metadata**
-        var imageMetadata = periodCollection.map(function(image) {
-          return ee.Feature(null, {
-            'image_id': image.id(),
-            'system_start_time': image.get('system:time_start'),
-            'cloud_coverage': image.get('CLOUDY_PIXEL_PERCENTAGE'),
-            'provider': image.get('SATELLITE'),
-            'collection': image.get('SENSOR')
-          });
-        });
-    
-        // **Export image metadata as CSV**
-        Export.table.toDrive({
-          collection: imageMetadata,
-          description: 'PeriodoCompleto_ImageList',
-          fileFormat: 'CSV',
-          folder: 'PINV01_Exports'
-        });
+  
     
         // Proceed with existing statistics computation
         var meanImage = periodCollection.mean()
@@ -715,6 +909,111 @@ var App = {
       App.processedCollection = processedCollection;
       App.filteredCollections = filteredCollections;
 },
+    /**
+   * Pulls every image in an ee.ImageCollection to the client
+   * and adds it to the map with simple RGB viz.
+   */
+  displayMedianComposites: function(collection) {
+  // 1) Get the count of images in the collection
+  collection.size().evaluate(function(n) {
+      if (n === 0) {
+        App.ui.forms.updateMessage("No hay imágenes para mostrar.", true);
+        return;
+      }
+      // 2) Build a server-side list of exactly n images
+      var imgList = collection.toList(n);
+      // 3) Loop client-side and add each median composite
+      for (var i = 0; i < n; i++) {
+        var img = ee.Image(imgList.get(i))
+                     .select(['B4_median','B3_median','B2_median']);
+        var viz = { min: 0, max: 0.3 };                  // stretch
+        var name = 'Mediana_' + (i + 1);
+        App.ui.forms.mainPanel_Map.addLayer(img, viz, name);
+      }
+    });
+  },
+  
+  // Populate the vars panel
+  
+  populate_panel: function (checkboxPanel, listCheck, objectforStoring) {
+    // Clear any existing widgets
+    checkboxPanel.clear();
+
+    listCheck.forEach(function (varName) {
+        // Create the checkbox
+        var checkbox = ui.Checkbox(varName, true);
+
+        //  tell the checkbox to run your update function when clicked 
+        checkbox.onChange(App.updateSelectedVarsList);
+
+        // Store the checkbox widget itself
+        objectforStoring.push(checkbox);
+
+        // Add the checkbox to the panel
+        checkboxPanel.add(checkbox);
+    });
+    
+    App.updateSelectedVarsList(); 
+
+  },
+  
+  updateSelectedVarsList: function() {
+    // Start with an empty list each time
+    var selectedNames = [];
+
+    // Loop through the array of checkbox WIDGETS
+    App.selected_vars.forEach(function(checkbox) {
+        // If a checkbox is checked, add its name (the label) to the list
+        if (checkbox.getValue()) {
+            selectedNames.push(checkbox.getLabel());
+        }
+    });
+
+    // Update the app's state with the fresh list of names
+    App.selectedVars = selectedNames;
+
+    // Optional: Print to the console to see the live result
+    print('Selected Variables:', App.selectedVars);
+  },
+  /**
+  * Creates a list of derived band names from selected base variables.
+  * For each base variable, it appends statistical suffixes (_mean, _median, etc.).
+  * @param {Array<string>} selectedBaseVars A list of base variable names like ['B4', 'NDVI'].
+  *  @returns {ee.List} A server-side list of derived band names for use with .select().
+  */
+  getDerivedBandNames: function (selectedBaseVars) {
+    var derivedNames = []; // Standard JavaScript array
+    var stats = ['_mean', '_median', '_min', '_max', '_stdDev'];
+  
+    selectedBaseVars.forEach(function(baseVar) {
+      stats.forEach(function(stat) {
+        // Simple, instant string concatenation in the browser
+        derivedNames.push(baseVar + stat);
+      });
+    });
+    print(derivedNames,"Objeto de variables a descargar")
+    return derivedNames; // Returns ['NDVI_mean', 'NDVI_median', ...]
+},
+  //getDerivedBandName_serverside: function(selectedBaseVars) {
+  //  var derivedNames = ee.List([]); // Start with an empty server-side list
+  //  var stats = ['_mean', '_median', '_min', '_max', '_stdDev'];
+    
+  //  // Ensure selectedBaseVars is a client-side array before iterating
+  //  if (!Array.isArray(selectedBaseVars)) {
+  //    print('Error: Input to getDerivedBandNames is not an array.');
+  //    return ee.List([]); // Return empty to prevent errors
+  //  }
+
+  //  selectedBaseVars.forEach(function(baseVar) {
+  //    stats.forEach(function(stat) {
+  //      // Add the new derived name to the server-side list
+  //      derivedNames = derivedNames.add(ee.String(baseVar).cat(stat));
+  //    });
+      
+  //  });
+    
+  //  return derivedNames;
+  //},
 
   ui: {
     init: function () {
@@ -732,6 +1031,8 @@ var App = {
         this.subpanel_Parameters.add(this.label_propertyID);
         this.subpanel_Parameters.add(this.textBox_propertyAssetID);
         this.subpanel_Parameters.add(this.button_uploadBoundary);
+        var varlist = App.available_variables.bands.concat(App.available_variables.indexes);
+        App.populate_panel(this.available_vars_panel,varlist,App.selected_vars );
         this.messagePanel.add(this.messageLabel);
         this.controlPanel.add(this.label_ToolTitle);
         this.controlPanel.add(this.subpanel_Parameters);
@@ -743,6 +1044,12 @@ var App = {
         this.controlPanel.add(this.slider_cloudCover);
         this.controlPanel.add(this.label_timeAggregation);
         this.controlPanel.add(this.select_timeAggregation);
+        this.controlPanel.add(this.label_available_vars);
+        this.controlPanel.add(this.available_vars_panel);
+        
+        
+
+
         this.controlPanel.add(this.label_spatialFilters);
         this.controlPanel.add(this.checkbox_mean);
         this.controlPanel.add(this.checkbox_median);
@@ -866,8 +1173,8 @@ var App = {
           }
         }
       }),
-      label_Period_start: ui.Label({value:'Fecha de inicio del periodo',style:{'fontWeight': 'bold'}}),
-      label_Period_end: ui.Label({value:'Fecha de fin del periodo',style:{'fontWeight': 'bold'}}),
+      label_Period_start: ui.Label({value:'Fecha de inicio del periodo (YYYY-MM-DD)',style:{'fontWeight': 'bold'}}),
+      label_Period_end: ui.Label({value:'Fecha de fin del periodo (YYYY-MM-DD)',style:{'fontWeight': 'bold'}}),
       textBox_Period_start: ui.Textbox({
         placeholder: 'aaaa-mm-dd',
         value: '2021-01-01',
@@ -887,13 +1194,28 @@ var App = {
         style: { width: '200px' }
       }),
       label_timeAggregation: ui.Label({value:'Agrupación temporal',style:{'fontWeight': 'bold'}}),
-            select_timeAggregation: ui.Select({
-          items: ['Trimestral', 'Semanas ISO', 'Periodo Completo'], // Added 'Periodo Completo'
-          placeholder: 'Seleccione un tipo de análisis',
-          onChange: function (selected) {
-            App.selectedTimeAggregation = selected;
-          }
+      
+      select_timeAggregation: ui.Select({
+      items: ['Trimestral', 'Semanas ISO', 'Periodo Completo'], // Added 'Periodo Completo'
+      placeholder: 'Seleccione un tipo de análisis',
+      onChange: function (selected) {
+        App.selectedTimeAggregation = selected;
+        }
       }),
+      
+      label_available_vars: ui.Label({value:'Variables',style:{'fontWeight': 'bold'}}),
+      available_vars_panel:ui.Panel({
+          'layout': ui.Panel.Layout.flow('horizontal'),
+          
+          'style': {
+              
+              'stretch': 'horizontal',
+               'shown':true,
+              // 'backgroundColor': '#cccccc',
+          },
+      }),
+      
+       
       label_spatialFilters: ui.Label({value:'Filtros espaciales (opcional)',style:{'fontWeight': 'bold'}}),
       checkbox_mean: ui.Checkbox({
         label: 'Aplicar media',
@@ -975,13 +1297,20 @@ var App = {
             //--------------------------------------------Processing---------------------------------------------    
             //---------------------------------------------------------------------------------------------------  
             
-            var imageCollection = ee.ImageCollection("COPERNICUS/S2_HARMONIZED")
+            var imageCollection = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
               .filterDate(startDate, endDate)
               .filterBounds(App.aoi)
               .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', cloudCoverValue))
-              .select(['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9',  'B11', 'B12'])
-              .map(App.addQuarterAndIsoWeek);
-      
+              .select(['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9',  'B11', 'B12',"QA60"])
+              .map(App.addQuarterAndIsoWeek)
+              .map(s2_tools.rescaleBands)
+              
+            // Collection for gap filling 
+            var imageColl_voidfilling =  imageCollection
+            
+            // Store the filtered collection for   
+
+            App.Image_Col_to_process = imageCollection
             // Only count ISO weeks if the selected time aggregation is "Semanas ISO"
             if (analysisType === 'Semanas ISO') {
               // This is just informative and will produce and store counts about the disponibility of 
@@ -1001,9 +1330,21 @@ var App = {
               if (cnt === 0) {
                 App.ui.forms.updateMessage("No se encontraron imágenes con los parámetros especificados.", true);
               } else {
-                //here the time analysis function is applied
-                App.applyTimeAnalysis(imageCollection);
-                App.ui.forms.updateMessage("Análisis completado. Revise la consola para más detalles.", false);
+                
+                // Run the processing
+
+                 // Cloud masking and void filling process
+                 var gapFilledCollection = App.applyCloudMaskAndFillVoids(imageCollection);
+                // Time aggregation
+                App.applyTimeAnalysis(gapFilledCollection);
+                App.ui.forms.updateMessage("Análisis completado. Visualizando resultados…", false);
+                
+                 App.ui.forms.mainPanel_Map.layers().reset();// (re‐add your AOI layer here if you want it to stay visible)
+                // Now show every generated composite on the map:
+                print(App.processedCollection, "Processed")
+                App.displayMedianComposites(App.processedCollection);
+                
+                
               }
             });
           });
@@ -1019,16 +1360,28 @@ var App = {
     }
 
     App.ui.forms.updateMessage("Preparando archivos para descargar...", false);
+    
+    // Get the list of bands to export based on checkbox selections
+    var bandsToExport = App.getDerivedBandNames(App.selectedVars);
 
     // Utilizar las colecciones procesadas almacenadas
-    var reducedCollection = App.processedCollection;
-    var filteredCollections = App.filteredCollections;
+    var reducedCollectionForExport  = App.processedCollection.select(bandsToExport); // Image or images temporally aggregated 
+    var filteredCollectionsForExport  = {};// Image or images temporally aggregated 
+    
+    // Select bands from any spatially filtered collections that exist
+    Object.keys(App.filteredCollections).forEach(function(filterType) {
+      var originalFilteredCollection = App.filteredCollections[filterType];
+      filteredCollectionsForExport[filterType] = originalFilteredCollection.select(bandsToExport);
+      
+    });
+    
     var region = App.aoi.geometry();
-
+    //print
+    print(reducedCollectionForExport,"reducedCollection")
     // Llamar a la función de exportación
-    App.exportModule.exportAll(reducedCollection, filteredCollections, region);
+    App.exportModule.exportAll(reducedCollectionForExport, filteredCollectionsForExport, region);
 
-    App.ui.forms.updateMessage("Descarga iniciada. Revise su Google Drive para los archivos exportados.", false);
+    App.ui.forms.updateMessage("Proceso de descarga iniciado, revise la pestaña Tasks.", false);
   }
 }),
     link_documentation:ui.Label({
