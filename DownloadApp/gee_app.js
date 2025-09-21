@@ -1,18 +1,23 @@
 /**
  * @name
+ * 
  *      Aplicación de procesamiento y descarga de imágenes satelitales - PINV01-528
  * 
  * @description
+ * 
  *      This is a processing and download tool for the PINV-528 project from CONACYT Paraguay
  *  
  * @author
+ * 
  *      Carlos Giménez
  * 
  * @contact
+ * 
  *      Carlos Giménez - carlos.gimenez@showmewhere.com/ 
  *      Dr. Pastor Pérez - peperez.estigarribia@pol.una.py/ peperez.estigarribia@gmail.com 
  *
  * @version
+ * 
  *    1.0.0 - CG Access and download data using user's vector
  *    1.1.0 - CG Updated to interface
  *    1.1.1 - CG Updated exporting names and other features
@@ -25,15 +30,20 @@
  *    1.1.6 - CG Added Cloud and shadows processing (Removals and void filling)
  *    1.1.7 - CG Variables selection
  *    1.1.7 - CG Reporting function for each time aggregation type
+ * 
  * @see
- *    Repository - https://github.com/carlosgl91/PINV01-528
+ * 
+ *  Repository - https://github.com/carlosgl91/PINV01-528
  * 
  * @comming soon
+ * 
  * English interface
+ * 
  * Study area subseting by field 
  * Shadow and cloud masking improvement using s2cloudness procedure 
  *  Image selecction for inclusion or exclusion
  *  Including other satelites (not so soon) (v.1.2)
+ * 
  */
 
 ui.root.clear();
@@ -128,7 +138,7 @@ var App = {
   exportModule: {
   // Function to export composite images (mean, median, etc.)
   exportCompositeImages: function(compositeCollection, descriptionPrefix, suffix, region, selectedTimeAggregation, batchSize) {
-  print(compositeCollection, "Pre export col")
+  print("Pre-export collection", compositeCollection )
   // Obtener la lista de IDs de imágenes sin traer toda la colección al cliente
   compositeCollection.aggregate_array('system:index').evaluate(function(imageIds) {
     if (!imageIds) return;
@@ -308,7 +318,7 @@ var App = {
     
      // **Collect image metadata**
      
-     print(compositeCollection,"ImageCollection to list")
+     //print(compositeCollection,"ImageCollection to list")
         var imageMetadata = compositeCollection.map(function(image) {
           return ee.Feature(null, {
             'image_id': image.id(),
@@ -336,6 +346,22 @@ var App = {
           folder: 'PINV01_Exports'
         });
   },
+  exportReportParameters: function(parameteres_dictionary){
+    
+    var toExportParameters = App.report
+        
+    // Convert to a FeatureCollection with one feature
+    var feature = ee.Feature(null, toExportParameters);
+    var fc = ee.FeatureCollection([feature]);
+        
+    // Export as CSV
+    Export.table.toDrive({
+      collection: fc,
+      description: 'PINV01_528_App_settings',
+      fileFormat: 'CSV',
+      folder:"PINV01_Exports"
+    });
+  },
 
   // Unified function to call export for reduced and filtered images
   /*
@@ -358,6 +384,8 @@ var App = {
     }
     
      App.exportModule.exportReportImageList(App.Image_Col_to_process);
+     
+     App.exportModule.exportReportParameters(App.report);
     // Export the reduced collection
     // This function use the reduced collection of images, the prefix, suffix (for spatially filtered)
     // region, selected time agreggation and batchSize 
@@ -466,7 +494,7 @@ var App = {
   var start = ee.Date(startDate);
   var end = ee.Date(endDate);
   var diffMonths = end.difference(start, 'month');
-  print(diffMonths,"diffMonths")
+  print("Period in months: ", diffMonths)
   var diffWeeks = end.difference(start, 'week');
 
   if (analysisType === 'Trimestral') {
@@ -972,8 +1000,7 @@ var App = {
     // Update the app's state with the fresh list of names
     App.selectedVars = selectedNames;
 
-    // Optional: Print to the console to see the live result
-    print('Selected Variables:', App.selectedVars);
+    
   },
   /**
   * Creates a list of derived band names from selected base variables.
@@ -1253,7 +1280,10 @@ var App = {
         label: 'Generar',
         style:{width:'150px'},
         onClick: function () {
-          // Estos valores van a ser utilizados dentro del reporte
+          
+        print('////// ----  Processing ---- ///// ');
+
+          // This values are 
           var startDate = App.ui.forms.textBox_Period_start.getValue();
           var endDate = App.ui.forms.textBox_Period_end.getValue();
           var cloudCoverValue = App.ui.forms.slider_cloudCover.getValue();
@@ -1265,7 +1295,9 @@ var App = {
           App.report.analysisType = analysisType;
          
  
-      print("Párametros:",App.report)
+      // print("Párametros:",App.report)
+      // Optional: Print to the console to see the live result
+      print('Selected Variables:', App.selectedVars);
       //---------------------------------------------------------------------------------------------------    
       //------------------------------------------------------Validation----------------------------------- 
       //--------------------------------------------------------------------------------------------------- 
@@ -1324,7 +1356,7 @@ var App = {
            App.report.img_count_months = imageCollection.aggregate_array('yearMonth').distinct().sort();
            App.report.img_count_iso_weeks = imageCollection.sort('date').aggregate_array('isoWeek_year').distinct();
             
-          print("Párametros:",App.report)
+          print("Parameters:",App.report)
 
             count.evaluate(function (cnt) {
               if (cnt === 0) {
@@ -1341,7 +1373,7 @@ var App = {
                 
                  App.ui.forms.mainPanel_Map.layers().reset();// (re‐add your AOI layer here if you want it to stay visible)
                 // Now show every generated composite on the map:
-                print(App.processedCollection, "Processed")
+                print("Processed collections: ",App.processedCollection )
                 App.displayMedianComposites(App.processedCollection);
                 
                 
@@ -1376,10 +1408,14 @@ var App = {
     });
     
     var region = App.aoi.geometry();
+    
+    print("////// --- Download --- ////")
     //print
     print(reducedCollectionForExport,"reducedCollection")
     // Llamar a la función de exportación
     App.exportModule.exportAll(reducedCollectionForExport, filteredCollectionsForExport, region);
+    
+    
 
     App.ui.forms.updateMessage("Proceso de descarga iniciado, revise la pestaña Tasks.", false);
   }
