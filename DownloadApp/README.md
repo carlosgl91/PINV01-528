@@ -3,7 +3,7 @@
 
 ## Descripción General
 
-Esta aplicación permite a los usuarios descargar imágenes satelitales de Sentinel-2 procesadas según diferentes agregaciones temporales y filtros espaciales. Proporciona una interfaz intuitiva para definir un área de interés (AOI), seleccionar parámetros de análisis y exportar los resultados directamente a Google Drive.
+Esta aplicación permite a los usuarios descargar imágenes satelitales de Sentinel-2 procesadas según diferentes agregaciones temporales y filtros espaciale s. Proporciona una interfaz intuitiva para definir un área de interés (AOI), seleccionar parámetros de análisis y exportar los resultados directamente a Google Drive.
 
 ---
 
