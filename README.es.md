@@ -22,9 +22,9 @@ La aplicación es capaz de generar 3 tipos de archivos:
    2. Listado detallado de imágenes y sus características en formato *.csv*, incluyendo datos como su GEE ID, cobertura de nubes y grilla.
    3. Datos de configuración y resultados como: tipo de análisis realizado, fecha de análisis,periodo analizado, humbral de cobertura de nubes, semanas iso con imágenes encontradas, meses con imágenes, cuenta total de imágenes.
 
-En la siguiente figura se presenta un  flujo de procesamiento resumido 
+En la siguiente figura se presenta un  flujo de procesamiento de imágenes satelitales: 
 
-![Drag Racing](DownloadApp\docs\img_es\App_workflow_528.jpg)
+![Drag Racing](DownloadApp/docs/img_es/App_workflow_528.jpg)
 
   
 
