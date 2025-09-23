@@ -1,6 +1,6 @@
 # Sen2TimeSeriesARD
 ## 1. Introducción
-Una aplicación de Google Earth Engine (JS API) para la producción de datos de series temporales, listos para el análisis (ARD), a través del procesamiento de imágenes satelitales Sentinel 2 (Figura 1)
+Una aplicación de Google Earth Engine (JS API) para la producción de datos de series temporales, listos para el análisis (ARD), a través del procesamiento de imágenes satelitales Sentinel 2 (Figura 1).
 
 ![img2](docs/es/img/App_workflow_528.jpg)
 Figura 1. Procesos principales en la generación de datos de sensores remotos a través de la aplicación
@@ -42,11 +42,19 @@ Figura 3. Interfaz de usuario de la aplicación
 1. Una vez con acceso al script de la aplicación, deberá ejecutar la misma través del botón "RUN". La aplicación será desplegada mostrando la interfaz de usuario, como se puede observar en la figura 1. Una vez desplegada la interfaz, el usuario deberá especificar una serie de parámetros necesarios para ejecutar la aplicación.
    
 2. Aquí se listan los parámetros de manera secuencial
-   1.  Áreas de interés: El área de interés puede ser especificada a través de el uso de assets de GEE (marcada por defecto) o bien dibujandola en el mapa marcando la opción "Dibujar en el mapa"
+   1.  Áreas de interés (AOI): El área de interés puede ser especificada a través de el uso de assets de GEE (marcada por defecto) o bien dibujandola en el mapa marcando la opción "Dibujar en el mapa", luego se debe cargar el polígono en la aplicación a través de el botón "Cargar límites". 
+   
+   ![Figure4](docs/es/img/img03.jpg)
 
-![Figure4](img03.jpg)
+    La aplicación procesará el área de estudio y generará mensajes en el panel de la esquina inferior izquierda, en donde, entre otros aparecerá el área estimada del AOI.
 
+    Aquí es importante mencionar que la aplicación cuenta con una limitación de tamaño del área de estudio (250.000 ha) impuesta de manera intencional, esto a fin de evitar errores por excesos de capacidad de computo de los usuarios. Usuarios intermedios y avanzados pueden modificar dicho límite a su discreción.
 
+    2. Fechas de inicio y fin del periodo de interés: los usuarios deberán especificar la ficha de inicio y fin del periodo de la aplicación en formato (YYYY-MM-DD). La aplicación validará el periodo teniendo en cuenta el tipo de agrupación temporal especificada o bien simplemente la validez del periodo en sí (figura 5).
+
+    ![Figure5](docs/es/img/figura05.jpg)
+    
+    Por defecto la aplicación calcula del periodo en meses 
 
 
 
