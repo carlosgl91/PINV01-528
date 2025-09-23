@@ -39,22 +39,35 @@ Encontrará mayor información acerca del funcionamiento de la API de JavaScript
 ![Figure3](img02.jpg)
 Figura 3. Interfaz de usuario de la aplicación
 
-1. Una vez con acceso al script de la aplicación, deberá ejecutar la misma través del botón "RUN". La aplicación será desplegada mostrando la interfaz de usuario, como se puede observar en la figura 1. Una vez desplegada la interfaz, el usuario deberá especificar una serie de parámetros necesarios para ejecutar la aplicación.
+### 2.1. Acceso a la aplicación
+ Una vez con acceso al script de la aplicación, deberá ejecutar la misma través del botón "RUN". La aplicación será desplegada mostrando la interfaz de usuario, como se puede observar en la figura 1. Una vez desplegada la interfaz, el usuario deberá especificar una serie de parámetros necesarios para ejecutar la aplicación.
    
-2. Aquí se listan los parámetros de manera secuencial
-   1.  Áreas de interés (AOI): El área de interés puede ser especificada a través de el uso de assets de GEE (marcada por defecto) o bien dibujandola en el mapa marcando la opción "Dibujar en el mapa", luego se debe cargar el polígono en la aplicación a través de el botón "Cargar límites". 
+### 2.2. Parámetros
+
+Aquí se listan los parámetros de manera secuencial: 
+
+   1.  Áreas de interés (AOI): El área de interés puede ser especificada a través de el uso de assets de GEE (marcada por defecto) o bien dibujandola en el mapa marcando la opción "Dibujar en el mapa", luego se debe cargar el polígono en la aplicación a través de el botón "Cargar límites".
    
    ![Figure4](docs/es/img/img03.jpg)
+   Figura 4. Opciones de carga de áreas de interés (AOI)
 
     La aplicación procesará el área de estudio y generará mensajes en el panel de la esquina inferior izquierda, en donde, entre otros aparecerá el área estimada del AOI.
 
     Aquí es importante mencionar que la aplicación cuenta con una limitación de tamaño del área de estudio (250.000 ha) impuesta de manera intencional, esto a fin de evitar errores por excesos de capacidad de computo de los usuarios. Usuarios intermedios y avanzados pueden modificar dicho límite a su discreción.
 
-    2. Fechas de inicio y fin del periodo de interés: los usuarios deberán especificar la ficha de inicio y fin del periodo de la aplicación en formato (YYYY-MM-DD). La aplicación validará el periodo teniendo en cuenta el tipo de agrupación temporal especificada o bien simplemente la validez del periodo en sí (figura 5).
+    2. Fechas de inicio y fin del periodo de interés: los usuarios deberán especificar la fecha de inicio y fin del periodo de la aplicación en formato (YYYY-MM-DD). La aplicación validará el periodo teniendo en cuenta el tipo de agrupación temporal especificada o bien simplemente la validez del periodo en sí (figura 5).
+   
+        Es importante tener en cuenta que las imágenes consideradas dependerán principalmente del periodo de busqueda, es decir las imágenes encontradas entre la fecha de inicio y fin. 
+        
+        ![Figure5](docs/es/img/figura05.jpg)
+        Figura 5. 
+        
+        Por defecto la aplicación calcula del periodo en meses, esto puede ser verificado en la pestaña de "Console" en donde se muestran esta y otras informaciones, así como también potenciales errores que pudiesen saltar de parte de GEE.
 
-    ![Figure5](docs/es/img/figura05.jpg)
-    
-    Por defecto la aplicación calcula del periodo en meses 
+    3. Porcentaje máximo de nubes: el usuario deberá especificar el valor máximo de cobertura de nubes permitido, este valor es comparado con el valor del campo 'CLOUDY_PIXEL_PERCENTAGE' de cada imagen sentinel, excluyendo todas las imágenes por encima del valor proporcionado.
+    4. Agrupación temporal: el usuario deberá elegir el tipo de agregación temporal al cual se someterá a las imágenes. Este valor define de que manera se divirá colección (Trimestral, Semanas ISO o Periodo completo). En cada caso se validará el periodo de acuerdo a la unidad temporal elegida, por ejemplo, en caso de elegirse la agrupación "Trimestral", la aplicación calculará y requerirá un periodo mínimo de 3 meses. Por otro lado en caso de elegirse agrupación por semanas ISO, se requerirá que el periodo cubra al menos 1 semana ISO.
+   
+    ![Figure6](docs/es/img/figura07.jpg)
 
 
 
