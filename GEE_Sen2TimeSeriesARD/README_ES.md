@@ -10,6 +10,9 @@ La aplicación ha sido desarrollada a través de la API en JavaScript de GEE, lo
 ![img1](docs/es/img/img01.jpg)
 Figura 2. Interfaz de usuario de la aplicación
 
+### 1.2 Especificaciones
+
+
 Actualmente la aplicación procesa las siguientes variables:
 
 Cuadro 1. Variables procesadas por la aplicación
@@ -31,6 +34,10 @@ Cuadro 1. Variables procesadas por la aplicación
 | SAVI     | Índice espectral  | -1 a +1      | 10m               | Índice de vegetación normalizada ajustado al suelo |
 | NDBI     | Índice espectral  | -1 a +1      | 20m               | Índice de Diferencia Normalizada de Áreas Construidas |
 | NDWI     | Índice espectral  | -1 a +1      | 10m               | Índice de Diferencia Normalizada de Agua |
+
+### 1.2.1 Filtrado de nubes
+
+!!!!!!!!!!! A DESARROLLAR !!!!!
 
 ## 2. Guía de uso
 
@@ -81,6 +88,11 @@ Aquí se listan los parámetros de manera secuencial:
 
     **c-) Periodo completo:** en este modo la unidad temporal de agrupación es simplemente el periodo de busqueda. Este modo de agrupación permite máxima flexibilidad en términos de filtros temporales.
 
-+ **Variables**: es posible seleccionar que variables serán incluidas para su procesamiento temporal. Actualmente, la aplicación cuenta con 15 variables, entre las que se encuentran 11 bandas espectrales y 4 índices de vegetación (NDVI, NDWI, NDBI y SAVI)
++ **Variables**: es posible seleccionar que variables serán incluidas para su procesamiento. Actualmente, la aplicación cuenta con 15 variables, entre las que se encuentran 11 bandas espectrales y 4 índices de vegetación (NDVI, NDWI, NDBI y SAVI) (ver cuadro 1).
+
++ **Filtros espaciales (opcional)**: Opcionalmente, la aplicación puede aplicar filtros espaciales sobre los productos ya agrupados temporalmente. Estos filtros modifican el valor de cada píxel utilizando su vecindad para calcular la media, la mediana o la moda (mayoría). Para ello, se emplea una ventana o "kernel" cuadrangular cuyo tamaño se ajusta con el parámetro "Tamaño del filtro espacial", que define el número de píxeles por lado de dicha ventana.
+
+### 2.3 Procesamiento y revisión iterativa
+Una vez especificados todos los parámetros, se debe ejecutar el proceso haciendo click en el botón "Generar". Los resultados serán generados, e impresos en la consola de la interfaz de GEE. Así mismo, se agregarán composiciones al mapa utilizando la mediana de cada unidad temporal a fin de observar visualmente los resultados. 
 
 
