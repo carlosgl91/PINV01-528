@@ -118,13 +118,23 @@ En el ejemplo de la figura 8 se observa el campo "img_count_total" que reporta l
  los trimestres presentes en el periodo de busqueda a través del campo "img_count_quarters" en formato "YYYY-Trimestre".
 
 
-<img src="docs/es/img/figura09.jpg" alt="Figure 9" height="300">
+<img src="docs/es/img/figura09.jpg" alt="Figure 9" height="350">
 
 Figura 8. Resumen de datos procesados por la aplicación
 
- - Colección de imágenes filtradas (ImageCollection): colección conteniendo el total de imágenes filtradas según el área de estudio, periodo y cobertura de nubes
- - Colección procesada (Processed collection): contiene una imágen por cada unidad temporal encontrada, es decir, en nuestro ejemplo, se encontraron 2 trimestres en los datos, por lo que se generó una imagen para cada trimestre. Cada imagen contiene las diferentes variables procesadas (B2_mean, B2_max,B2_min,B2_median,B2_stdDev) como se puede ver en la figura 9. 
+ - Colección de imágenes filtradas (ImageCollection): colección de imágenes conteniendo el total de imágenes filtradas según el área de estudio, periodo y cobertura de nubes. Esta variable es útil para la revisión de las imágenes presentes dentro de los datos procesados, como por ejemplo: números de imágenes por grilla, número de imágenes por mes y el id de cada imagen en caso de querer visualizarlas individualmente. 
 
+ - Colección procesada (Processed collection): contiene una imágen por cada unidad temporal encontrada, es decir, en nuestro ejemplo, se encontraron 2 trimestres en los datos, por lo que se generó una imagen para cada trimestre. La aplicación también genera propiedades de cada conjunto de imágenes utilizadas para la composición de cada imagen resultante, como por ejemplo, la cantidad de imágenes agrupadas por unidad temporal a través del campo "image_count", la fecha de la primera y última imagen en orden temporal utilizando los campos "start_date" y "end_date" (Figura 9)
+ 
+ <img src="docs/es/img/figura10.jpg" alt="Figure 9" height="350">
+
+Figura 9. Datos de imágenes resultantes
+
+Cada imagen contiene las diferentes variables procesadas como por ejemplo para las variables B2 y NDVI se generaron B2_mean, B2_max,B2_min,B2_median,B2_stdDev y NDVI_mean, NDVI_max, NDVI_min,NDVI_median, NDVI_stdDev como se puede ver en la figura 10.
+
+<img src="docs/es/img/figura11.jpg" alt="Figure 9" height="350">
+
+Figura 9. Datos de imágenes resultantes
 
 
 
