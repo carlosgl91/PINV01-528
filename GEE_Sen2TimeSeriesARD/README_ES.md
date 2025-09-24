@@ -95,4 +95,37 @@ Aquí se listan los parámetros de manera secuencial:
 ### 2.3 Procesamiento y revisión iterativa
 Una vez especificados todos los parámetros, se debe ejecutar el proceso haciendo click en el botón "Generar". Los resultados serán generados, e impresos en la consola de la interfaz de GEE. Así mismo, se agregarán composiciones al mapa utilizando la mediana de cada unidad temporal a fin de observar visualmente los resultados. 
 
+Cada vez que el botón "Generar" sea ejecutado, la aplicación procederá a colectar todos los parámetros, generar la consulta y procesar las agrupaciones y filtrados de acuerdo a lo especificado. Por lo que de esta manera, es posible ir probando los parámetros y verificando los resultados tanto en la consola como en el mapa. 
+
+En el siguiente ejemplo, utilizaremos como área de estudio la ciudad de Asunción, Paraguay, y verificaremos los resultados aplicando los siguientes parámetros:
+
+- periodo: 2021-01-01, 2021-06-30
+- Porcentaje máximo de nubes: 1 %
+- Agrupación temporal: Trimestral
+- Variables: 15 variables (B2-B12, NDVI, NDWI, NDBI, SAVI)
+- Filtros espaciales: media, mediana y mayoría
+- Tamaño de filtro espacial: 3 píxeles
+
+Como se ha mencionado anteriormente, cada vez que el botón "Generar" es ejecutado, la aplicación imprimirá en la consola una nueva sección de "Processing" debajo de la cual se mostrarán los parámetros utilizados, y datos referentes a los resultados analizados de las imágenes, como por ejemplo:
+
+ - Las variables seleccionadas: el listado de variables procesadas
+ - Periodo en meses: el periodo comprendido por la fecha inicial y final en meses
+ - Parámetros: listado de parámetros utilizados y resultados como: conteo de imágenes, semanas ISO dentro del periodo, semanas ISO con datos y sin datos de acuerdo con los resultados, número total de imágenes, trimestres presentes, entre otros. 
+  ![Figure8](docs/es/img/figura08.jpg)
+  Figura 7. Resultados impresos en la consola
+
+En el ejemplo de la figura 8 se observa el campo "img_count_total" que reporta la cantidad de imágenes filtradas, el campo "img_count_iso_weeks" presenta las semanas ISO que registraron datos en el formato "YYYY_ISO_WEEK". Así mismo, también se presentan los meses con datos en el formato "YYYY-MM" y
+ los trimestres presentes en el periodo de busqueda a través del campo "img_count_quarters" en formato "YYYY-Trimestre".
+
+
+<img src="docs/es/img/figura09.jpg" alt="Figure 9" height="300">
+
+Figura 8. Resumen de datos procesados por la aplicación
+
+ - Colección de imágenes filtradas (ImageCollection): colección conteniendo el total de imágenes filtradas según el área de estudio, periodo y cobertura de nubes
+ - Colección procesada (Processed collection): contiene una imágen por cada unidad temporal encontrada, es decir, en nuestro ejemplo, se encontraron 2 trimestres en los datos, por lo que se generó una imagen para cada trimestre. Cada imagen contiene las diferentes variables procesadas (B2_mean, B2_max,B2_min,B2_median,B2_stdDev) como se puede ver en la figura 9. 
+
+
+
+
 
