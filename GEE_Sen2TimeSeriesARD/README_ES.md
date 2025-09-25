@@ -136,6 +136,18 @@ Cada imagen contiene las diferentes variables procesadas como por ejemplo para l
 
 Figura 9. Datos de imágenes resultantes
 
+### 2.4 Descargas
+
+Una vez analizados los datos generados, podrá iniciar el proceso de descarga de datos haciendo click en el botón "Descargar". El módulo de descarga está diseñado para exportar un conjunto completo y organizado de resultados a su espacio en Google Drive, permitiendo posteriormente usar los datos en otros softwares como QGIS o R.
+
+Actualmente la aplicación es capaz de exportar tres tipos de archivo:
+  
++ Datos en formato *.tif* : rasters multibanda por unidad temporal, esto es por ejemplo, si el análisis corresponde a los trimestres del año 2024, la aplicación generará 4 rasters correspondientes a Q1,Q2,Q3 y Q4 del 2024, conteniendo cada uno estadisticas temporales espacialmente explicitas (min, max, media, mediana y desviación estándar) del conjunto de datos sentinel 2 filtrados en ese periodo en el área de interés.
+
++ Listado detallado de imágenes y sus características en formato *.csv*, incluyendo datos como su GEE ID, cobertura de nubes y grilla.
+
++ Datos de configuración y resultados como: tipo de análisis realizado, fecha de análisis, periodo analizado, humbral de cobertura de nubes, semanas ISO con imágenes encontradas, meses con imágenes, cuenta total de imágenes. 
+
 
 
 
